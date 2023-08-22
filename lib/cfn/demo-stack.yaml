@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Create a template to export parameters'
+Parameters:
+  AwsDemoParameter:
+    Description: "Name to be exported"
+    Type: String
+Conditions:
+  HasNot:
+    Fn::Equals: [ 'a', 'b' ]
+Resources:
+  NullResource:
+    Type: 'Custom::NullResource'
+    Condition: HasNot
+    Properties:
+      ServiceToken: !Ref AWS::NoValue
+Outputs:
+  TemplateID:
+    Description: gen-demo-name
+    Value: general/demo/name
+  TemplateVersion:
+    Description: applying.pe template version.
+    Value: 1.0.0
+  StackName:
+    Description: Stack name.
+    Value: !Sub '${AWS::StackName}'
+  ManagedRuleName:
+    Description: Name of the AWS Managed Rule.
+    Value: !Ref AwsDemoParameter
+    Export:
+      Name: !Sub '${AWS::StackName}-RuleName'

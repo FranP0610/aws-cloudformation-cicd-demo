@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Create a template to export parameters'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Export Name Parameter
+        Parameters:
+          - AwsDemoParameter
+Parameters:
+  AwsDemoParameter:
+    Description: "Name to be exported"
+    Type: String
+Resources:
+  DemoStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../lib/cfn/demo-stack.yaml
+      Parameters:
+        AwsDemoParameter: !Ref AwsDemoParameter
+Outputs:
+  TemplateID:
+    Description: A demo template
+    Value: general/demo/name
+  TemplateVersion:
+    Description: Template version.
+    Value: 1.0.0
+  StackName:
+    Description: Stack name.
+    Value: !Sub '${AWS::StackName}'

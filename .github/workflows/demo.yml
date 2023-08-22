@@ -1,0 +1,69 @@
+name: 'GitHub Actions Pipeline to Deploy CFN'
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - '**demo.yml'
+env:
+  BUCKET_NAME: "fran-prueba-template"
+  BUCKET_PREFIX: "demo"
+  AWS_REGION: "us-east-1" #Change to reflect your Region
+  STACK_NAME: "fran-demo-cf"
+  CFN_STACK: "demo"
+  IAM_ROLE: ${{ secrets.IAM_ROLE }}
+
+# Permission can be added at job level or workflow level
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    outputs:
+      BUCKET_URI: ${{ steps.setOutput1.outputs.BUCKET_URI }}
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v3
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.IAM_ROLE }} #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Set the date as an environment variable
+        run: |
+          echo "DATE=$(date +'%Y-%m-%d-%H-%M-%S')" >> $GITHUB_ENV
+      # Package file
+      - name: Package cloudformation
+        run: |
+          aws cloudformation package --template-file ./stacks/${{env.CFN_STACK}}/template.yaml --s3-bucket ${{ env.BUCKET_NAME }} --s3-prefix ${{ env.BUCKET_PREFIX}} --output-template-file packaged-template.yaml
+      # Copy File into S3
+      - name: Copy packaged file to S3
+        run: |
+          aws s3 cp packaged-template.yaml s3://${{ env.BUCKET_NAME }}/${{ env.BUCKET_PREFIX}}/${{ env.DATE }}/
+      - name: Set URI as Output
+        id: setOutput1
+        run: |
+          echo "BUCKET_URI=https://${{ env.BUCKET_NAME }}.s3.amazonaws.com/${{ env.BUCKET_PREFIX}}/${{ env.DATE }}/packaged-template.yaml" >> $GITHUB_OUTPUT
+  Deploy:
+    needs: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v3
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.IAM_ROLE }} #change to reflect your IAM role’s ARN
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy to AWS CloudFormation
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.STACK_NAME}}
+          template: ${{needs.Build.outputs.BUCKET_URI}}
+          no-fail-on-empty-changeset: "1"
+          capabilities: "CAPABILITY_NAMED_IAM"
+          parameter-overrides: >-
+            AwsDemoParameter="This-is-a-demo"
